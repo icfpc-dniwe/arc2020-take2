@@ -1,0 +1,9 @@
+[package]
+name = "arc2020-take2"
+version = "0.1.0"
+authors = ["Nikolay Amiantov <ab@fmap.me>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
