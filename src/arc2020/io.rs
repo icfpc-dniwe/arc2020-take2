@@ -1,10 +1,9 @@
 use std::fs::{self, File};
-use std::io::BufReader;
+use std::io::{BufReader, Write};
 use std::path::Path;
 use std::collections::HashMap;
 use serde::Deserialize;
 use ndarray::Array2;
-use itertools::Itertools;
 use failure::err_msg;
 
 use super::types::*;
@@ -52,7 +51,7 @@ pub fn deserialize_task_train(task: &TaskTrainJson) -> MyResult<TaskTrain> {
 pub fn deserialize_task_test(task: &TaskTestJson) -> MyResult<TaskTest> {
     Ok(TaskTest {
         input: deserialize_image(&task.input)?,
-        output: task.output.as_ref().map(|x| deserialize_image(&x)).transpose()?,
+        output: task.output.as_ref().map(|x| deserialize_image(&x)).transpose()?.into_iter().collect(),
     })
 }
 
@@ -63,15 +62,30 @@ pub fn deserialize_task(task: &TaskJson) -> MyResult<Task> {
     })
 }
 
-pub fn serialize_image(img: &Image) -> String {
-    let mut str = img.outer_iter().map(|row| row.iter().map(|x| x.to_string()).join("")).join("|");
-    str.insert(0, '|');
-    str.push('|');
-    str
+pub fn serialize_image<S: Write>(stream: &mut S, img: &Image) -> MyResult<()> {
+    if img.len() == 0 {
+        stream.write_all(b"||")?;
+    } else {
+        stream.write_all(b"|")?;
+        for row in img.outer_iter() {
+            for x in row {
+                write!(stream, "{}", x)?;
+            }
+            stream.write_all(b"|")?;
+        }
+    }
+    Ok(())
 }
 
-pub fn serialize_images<T: Iterator<Item = Image>>(imgs: T) -> String {
-    imgs.map(|x| serialize_image(&x)).join(" ")
+pub fn serialize_images<'a, S: Write, T: Iterator<Item = &'a Image>>(stream: &'a mut S, mut imgs: T) -> MyResult<()> {
+    if let Some(img) = imgs.next() {
+        serialize_image(stream, img)?;
+        for img in imgs {
+            stream.write_all(b" ")?;
+            serialize_image(stream, img)?;
+        }
+    }
+    Ok(())
 }
 
 pub fn read_all_tasks(dir_path: &Path) -> MyResult<HashMap<String, Task>> {
@@ -88,4 +102,18 @@ pub fn read_all_tasks(dir_path: &Path) -> MyResult<HashMap<String, Task>> {
         }
     }
     Ok(tasks)
+}
+
+pub fn serialize_all_tasks<S: Write>(stream: &mut S, tasks: &HashMap<String, TaskSolution>) -> MyResult<()> {
+    stream.write_all(b"output_id,output\n")?;
+    for (name, task) in tasks {
+        for (n, test) in task.test.iter().enumerate() {
+            if test.output.len() > 0 {
+                write!(stream, "{}_{},", name, n)?;
+                serialize_images(stream, test.output.iter())?;
+                stream.write_all(b"\n")?;
+            }
+        }
+    }
+    Ok(())
 }

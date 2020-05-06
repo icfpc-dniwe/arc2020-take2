@@ -6,7 +6,7 @@ rustPlatform.buildRustPackage {
 
   src = lib.cleanSource ./.;
 
-  cargoSha256 = "0rq2brpii5vf54h5va5f7kjyjm6jgk3gxzfic4j6fp2irkjr7a2g";
+  cargoSha256 = "0psdjgcnabnydqai3rj9fdxh1rw5wv3lybgj41l0iy8sn9rm0hzd";
 
   buildInputs = [ ];
   nativeBuildInputs = [ xclip ];
