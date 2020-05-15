@@ -1,5 +1,9 @@
 pub mod types;
+pub mod score;
+pub mod operation;
+pub mod operations_solver;
 pub mod stub;
+pub mod greedy;
 
 use std::collections::HashMap;
 use types::Solver;
