@@ -6,7 +6,6 @@ use std;
 use std::cmp;
 use std::collections::HashMap;
 use std::collections::LinkedList;
-use std::hash::Hash;
 
 pub type Point = (i64, i64);
 pub type Vector = (i64, i64);
@@ -28,13 +27,6 @@ pub enum Operation {
     ExtractObjects,
 }
 
-// what the actual fuck???
-// see https://stackoverflow.com/a/30414450
-pub fn modify_value_in_hash_map<K : Hash + Eq, V>(dst: &mut HashMap<K, V>, k: K, v: V)
-{
-    dst.insert(k, v);
-}
-
 pub fn apply_block(src: ImageBlock, pivot: &Point, w: u64, h: u64) -> Result<ImageBlock>
 {
     let mut blc = ImageBlock {
@@ -48,7 +40,7 @@ pub fn apply_block(src: ImageBlock, pivot: &Point, w: u64, h: u64) -> Result<Ima
             let elem = src.block.get(&(x as i64, y as i64));
             match elem
             {
-                Some(&value) => modify_value_in_hash_map(&mut blc.block, (x as i64, y as i64), value),
+                Some(&value) => { blc.block.insert((x as i64, y as i64), value); },
                 None => assert!(false, "impossible"),
             }
         }
@@ -63,7 +55,7 @@ pub fn apply_shift(mut blc: ImageBlock, v: &Vector) -> Result<ImageBlock>
     {
         let new_x = *x + v.0;
         let new_y = *y + v.1;
-        modify_value_in_hash_map(&mut new_block, (new_x, new_y), *color);
+        new_block.insert((new_x, new_y), *color);
     }
     blc.block = new_block;
 
@@ -90,7 +82,7 @@ pub fn apply_rotate(mut blc: ImageBlock, pivot: &Point, angle: f64) -> Result<Im
         let yf = *y as f64;
         let new_x = (round::half_up(xf + vec_x_new, 0)) as i64;
         let new_y = (round::half_up(yf + vec_y_new, 0)) as i64;
-        modify_value_in_hash_map(&mut new_block, (new_x, new_y), *color);
+        new_block.insert((new_x, new_y), *color);
     }
     blc.block = new_block;
     blc.pivot = (round::half_up((pivot.0 as f64) + vec_x_new, 0) as i64, round::half_up((pivot.1 as f64) + vec_y_new, 0) as i64);
@@ -107,7 +99,7 @@ pub fn apply_change_color(mut blc: ImageBlock, func: fn (u8) -> u8) -> Result<Im
 
     for (p, c) in fuck_rust
     {
-        modify_value_in_hash_map(&mut blc.block, p, c);
+        blc.block.insert(p, c);
     }
 
     Ok(blc)
@@ -123,7 +115,7 @@ pub fn apply_change_color_unconditionally(mut blc: ImageBlock, color: u8) -> Res
 
     for (p, c) in fuck_rust
     {
-        modify_value_in_hash_map(&mut blc.block, p, c);
+        blc.block.insert(p, c);
     }
 
     Ok(blc)
@@ -146,7 +138,7 @@ pub fn apply_flip_x(mut blc: ImageBlock) -> Result<ImageBlock>
 
     for (p, c) in fuck_rust
     {
-        modify_value_in_hash_map(&mut blc.block, p, c);
+        blc.block.insert(p, c);
     }
 
     Ok(blc)
@@ -169,7 +161,7 @@ pub fn apply_flip_y(mut blc: ImageBlock) -> Result<ImageBlock>
 
     for (p, c) in fuck_rust
     {
-        modify_value_in_hash_map(&mut blc.block, p, c);
+        blc.block.insert(p, c);
     }
 
     Ok(blc)
@@ -182,7 +174,7 @@ pub fn apply_filter_by(mut blc: ImageBlock, pred: fn (Point, u8) -> bool) -> Res
     {
         if pred((*x, *y), *color)
         {
-            modify_value_in_hash_map(&mut new_block, (*x, *y), *color);
+            new_block.insert((*x, *y), *color);
         }
     }
     blc.block = new_block;
@@ -220,7 +212,7 @@ pub fn extract_block_from_image(src: &Image, pivot: &Point, w: u64, h: u64) -> R
     {
         for y in 0..h
         {
-            modify_value_in_hash_map(&mut blc.block, (x as i64, y as i64), src[(x as usize, y as usize)]);
+            blc.block.insert((x as i64, y as i64), src[(x as usize, y as usize)]);
         }
     }
     Ok(blc)
