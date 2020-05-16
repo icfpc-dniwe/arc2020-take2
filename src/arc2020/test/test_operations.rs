@@ -230,4 +230,31 @@ mod test_operations {
         }
         Ok(())
     }
+
+    #[test]
+    fn test_block_change_color() -> Result<()>
+    {
+        let img = gen_test_image();
+        {
+            let blc = extract_block_from_image(&img, &(1, 1), 2, 2)?;           
+            let new = apply_block_operation(blc, &Operation::ChangeColorUnconditionally(5))?;
+            let blc_data = new.block;
+            assert_eq!(option_as_result(blc_data.get(&(0, 0)))?, &(5 as u8));
+            assert_eq!(option_as_result(blc_data.get(&(0, 1)))?, &(5 as u8));
+            assert_eq!(option_as_result(blc_data.get(&(1, 0)))?, &(5 as u8));
+            assert_eq!(option_as_result(blc_data.get(&(1, 1)))?, &(5 as u8));
+            assert_eq!(blc_data.get(&(2, 2)), None);
+        }
+        {
+            let blc = extract_block_from_image(&img, &(1, 1), 2, 2)?;           
+            let new = apply_block_operation(blc, &Operation::ChangeColor(|x| match x { 0 => 4, 9 => 5, _ => x }))?;
+            let blc_data = new.block;
+            assert_eq!(option_as_result(blc_data.get(&(0, 0)))?, &(7 as u8));
+            assert_eq!(option_as_result(blc_data.get(&(0, 1)))?, &(8 as u8));
+            assert_eq!(option_as_result(blc_data.get(&(1, 0)))?, &(4 as u8));
+            assert_eq!(option_as_result(blc_data.get(&(1, 1)))?, &(5 as u8));
+            assert_eq!(blc_data.get(&(2, 2)), None);
+        }
+        Ok(())
+    }
 }
