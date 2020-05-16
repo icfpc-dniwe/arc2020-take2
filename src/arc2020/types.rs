@@ -1,7 +1,4 @@
 use ndarray::{CowArray, Array2, Ix2, ArrayView2};
-use failure;
-
-pub type MyResult<A> = Result<A, failure::Error>;
 
 pub type Image = Array2<u8>;
 pub type CowImage<'a> = CowArray<'a, u8, Ix2>;

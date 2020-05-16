@@ -1,16 +1,16 @@
-#[macro_use] extern crate failure;
+#[macro_use] extern crate anyhow;
 extern crate serde;
 pub mod arc2020;
 
+use anyhow::Result;
 use std::iter::FromIterator;
 use std::io::{stdout, BufWriter};
 use std::path::Path;
 use self::arc2020::io;
-use self::arc2020::types::MyResult;
 use self::arc2020::solver::{self, operations_solver::OpSolver, score::StubMetric, greedy::GreedySolver};
 use self::arc2020::solver::operation::{*, types::*, geometry::*};
 
-fn main() -> MyResult<()> {
+fn main() -> Result<()> {
     let simple_ops: Vec<Box<dyn Operation>> = vec!(Box::new(Transpose::new()));
     let learnable_ops: Vec<Box<dyn LearnableOperationBox>> = vec!();
     let ops = Operations {
