@@ -18,5 +18,5 @@ pub trait Operation: NamedOperation {
 pub trait LearnableOperation {
     type Op: Operation;
 
-    fn learn<'a, I: Iterator<Item = (ImageView<'a>, ImageView<'a>)>>(&'a self, img: I) -> Option<Self::Op>;
+    fn learn<'a, 'b, I: Iterator<Item = (ImageView<'a>, ImageView<'a>)>>(&'b self, imgs: I) -> Option<Self::Op>;
 }
