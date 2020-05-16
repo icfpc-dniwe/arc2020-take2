@@ -27,7 +27,7 @@ impl LearnableNoop {
 impl LearnableOperation for LearnableNoop {
     type Op = Noop;
    
-    fn learn<'a, I: Iterator<Item = (ImageView<'a>, ImageView<'a>)>>(&'a self, _imgs: I) -> Option<Self::Op> {
+    fn learn<'a, 'b, I: Iterator<Item = (ImageView<'a>, ImageView<'a>)>>(&'b self, _imgs: I) -> Option<Self::Op> {
         Some(Noop::new())
     }
 }
