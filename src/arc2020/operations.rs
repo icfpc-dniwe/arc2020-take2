@@ -30,8 +30,8 @@ pub enum Operation {
 
 pub fn apply_block(mut blc: ImageBlock, pivot: &Point, w: u64, h: u64) -> Result<ImageBlock>
 {
-    assert!(pivot.0 >= 0);
-    assert!(pivot.1 >= 0);
+    //assert!(pivot.0 >= 0);
+    //assert!(pivot.1 >= 0);
     let mut new_block : HashMap<Point, u8> = HashMap::new();
     for ((x, y), color) in &blc.block
     {
@@ -77,7 +77,7 @@ pub fn apply_rotate(mut blc: ImageBlock, angle: f64) -> Result<ImageBlock>
     {
         let x_new = c * (*x as f64) + s * (*y as f64);
         let y_new = -s * (*x as f64) + c * (*y as f64);
-        println!("x_new: {}, y_new: {}, color: {}", x_new, y_new, *color);
+        //println!("x_new: {}, y_new: {}, color: {}", x_new, y_new, *color);
         let new_x = (round::half_up(x_new, 0)) as i64;
         let new_y = (round::half_up(y_new, 0)) as i64;
         new_block.insert((new_x, new_y), *color);
@@ -224,7 +224,7 @@ pub fn commit_block_to_image(mut img: Image, blc: &ImageBlock) -> Result<Image>
         let img_y = y + blc.pivot.1;
         assert!(img_y >= 0 && (img_y as usize) < img.nrows());
         assert!(img_x >= 0 && (img_x as usize) < img.ncols());
-        img[(*y as usize, *x as usize)] = *color;
+        img[(img_x as usize, img_y as usize)] = *color;
     }
     Ok(img)
 }
@@ -234,14 +234,8 @@ pub fn apply_image_operations(img: Image, ops: &LinkedList<Operation>) -> Result
     let mut cur_block = extract_block_from_image(&img, &(0, 0), img.shape()[0] as u64, img.shape()[1] as u64);
     for op in ops
     {
-        match cur_block {
-            Ok(blc) => cur_block = apply_block_operation(blc, &op),
-            Err(msg) => return Err(msg),
-        }
+        cur_block = apply_block_operation(cur_block?, &op);
     }
 
-    match cur_block {
-        Ok(blc) => return commit_block_to_image(img, &blc),
-        Err(msg) => return Err(msg),
-    }
+    commit_block_to_image(img, &cur_block?)
 }

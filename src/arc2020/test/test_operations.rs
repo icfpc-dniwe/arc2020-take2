@@ -3,6 +3,7 @@ mod test_operations {
     use crate::arc2020::types::*;
     use crate::arc2020::operations::*;
     use anyhow::Result;
+    use std::collections::LinkedList;
 
     fn gen_test_image() -> Image
     {
@@ -205,19 +206,9 @@ mod test_operations {
         }
         {
             let blc = extract_block_from_image(&img, &(1, 1), 2, 2)?;
-            println!("blc:");
-            for (p, c) in &blc.block
-            {
-                println!("({}, {}): {}", p.0, p.1, c);
-            }
             let blc_pvt = blc.pivot;
             
             let new = apply_block_operation(blc, &Operation::Rotate(45.0_f64.to_radians()))?;
-            println!("new:");
-            for (p, c) in &new.block
-            {
-                println!("({}, {}): {}", p.0, p.1, c);
-            }
             assert_eq!(new.pivot.0, blc_pvt.0);
             assert_eq!(new.pivot.1, blc_pvt.1);
 
@@ -255,6 +246,125 @@ mod test_operations {
             assert_eq!(option_as_result(blc_data.get(&(1, 1)))?, &(5 as u8));
             assert_eq!(blc_data.get(&(2, 2)), None);
         }
+        Ok(())
+    }
+
+    #[test]
+    fn test_block_flip() -> Result<()>
+    {
+        let img = gen_test_image();
+        {
+            let blc = extract_block_from_image(&img, &(1, 1), 2, 2)?;
+            let blc_pvt = blc.pivot;
+
+            let new = apply_block_operation(blc, &Operation::FlipX)?;
+            assert_eq!(new.pivot.0, blc_pvt.0);
+            assert_eq!(new.pivot.1, blc_pvt.1);
+            let blc_data = new.block;
+            assert_eq!(option_as_result(blc_data.get(&(0, 0)))?, &(0 as u8));
+            assert_eq!(option_as_result(blc_data.get(&(0, 1)))?, &(9 as u8));
+            assert_eq!(option_as_result(blc_data.get(&(1, 0)))?, &(7 as u8));
+            assert_eq!(option_as_result(blc_data.get(&(1, 1)))?, &(8 as u8));
+            assert_eq!(blc_data.get(&(2, 2)), None);
+        }
+        {
+            let blc = extract_block_from_image(&img, &(1, 1), 2, 2)?;
+            let blc_pvt = blc.pivot;
+
+            let new = apply_block_operation(blc, &Operation::FlipY)?;
+            assert_eq!(new.pivot.0, blc_pvt.0);
+            assert_eq!(new.pivot.1, blc_pvt.1);
+            let blc_data = new.block;
+            assert_eq!(option_as_result(blc_data.get(&(0, 0)))?, &(8 as u8));
+            assert_eq!(option_as_result(blc_data.get(&(0, 1)))?, &(7 as u8));
+            assert_eq!(option_as_result(blc_data.get(&(1, 0)))?, &(9 as u8));
+            assert_eq!(option_as_result(blc_data.get(&(1, 1)))?, &(0 as u8));
+            assert_eq!(blc_data.get(&(2, 2)), None);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_block_filter_by() -> Result<()>
+    {
+        let img = gen_test_image();
+        {
+            let blc = extract_block_from_image(&img, &(1, 1), 2, 2)?;
+            let blc_pvt = blc.pivot;
+
+            let new = apply_block_operation(blc, &Operation::FilterBy(|_, c| c != 0 ))?;
+            assert_eq!(new.pivot.0, blc_pvt.0);
+            assert_eq!(new.pivot.1, blc_pvt.1);
+            let blc_data = new.block;
+            assert_eq!(option_as_result(blc_data.get(&(0, 0)))?, &(7 as u8));
+            assert_eq!(option_as_result(blc_data.get(&(0, 1)))?, &(8 as u8));
+            assert_eq!(option_as_result(blc_data.get(&(1, 1)))?, &(9 as u8));
+            assert_eq!(blc_data.get(&(1, 0)), None);
+        }
+        {
+            let blc = extract_block_from_image(&img, &(1, 1), 2, 2)?;
+            let blc_pvt = blc.pivot;
+
+            let new = apply_block_operation(blc, &Operation::FilterBy(|_, c| c == 3 ))?;
+            assert_eq!(new.pivot.0, blc_pvt.0);
+            assert_eq!(new.pivot.1, blc_pvt.1);
+            let blc_data = new.block;
+            assert_eq!(blc_data.get(&(0, 0)), None);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_commit_block_to_image() -> Result<()>
+    {
+        {
+            let img = gen_test_image();
+
+            let mut blc = extract_block_from_image(&img, &(1, 1), 2, 2)?;
+            blc = apply_block_operation(blc, &Operation::Shift((1, 1)))?;
+            let _img = commit_block_to_image(img, &blc)?;
+
+            //for (p, c) in _img.indexed_iter()
+            //{
+            //    println!("({}, {}): {}", p.0, p.1, c);
+            //}
+
+            assert_eq!(option_as_result(_img.get((1, 1)))?, &(7 as u8));
+            assert_eq!(option_as_result(_img.get((1, 2)))?, &(8 as u8));
+            assert_eq!(option_as_result(_img.get((2, 2)))?, &(7 as u8));
+            assert_eq!(option_as_result(_img.get((2, 3)))?, &(8 as u8));
+            assert_eq!(option_as_result(_img.get((3, 3)))?, &(9 as u8));
+            assert_eq!(option_as_result(_img.get((3, 2)))?, &(0 as u8));
+            assert_eq!(option_as_result(_img.get((2, 1)))?, &(0 as u8));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_perform_multiple_operations_on_image() -> Result<()>
+    {
+        let img = gen_test_image();
+
+        let mut ops = LinkedList::new();
+        ops.push_back(Operation::Block((1, 1), (2, 2)));
+        ops.push_back(Operation::FilterBy(|_, x| x != 0));
+        ops.push_back(Operation::Rotate(180_f64.to_radians()));
+        ops.push_back(Operation::Shift((1, 0)));
+
+        let res = apply_image_operations(img, &ops)?;
+
+        //for (p, c) in res.indexed_iter()
+        //{
+        //    println!("({}, {}): {}", p.0, p.1, c);
+        //}
+
+        assert_eq!(option_as_result(res.get((1, 1)))?, &(7 as u8));
+        assert_eq!(option_as_result(res.get((1, 2)))?, &(8 as u8));
+        assert_eq!(option_as_result(res.get((2, 2)))?, &(9 as u8));
+        assert_eq!(option_as_result(res.get((2, 1)))?, &(7 as u8));
+        assert_eq!(option_as_result(res.get((2, 0)))?, &(8 as u8));
+        assert_eq!(option_as_result(res.get((1, 0)))?, &(9 as u8));
+        assert_eq!(option_as_result(res.get((3, 3)))?, &(3 as u8));
         Ok(())
     }
 }
