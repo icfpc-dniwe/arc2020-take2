@@ -163,7 +163,7 @@ pub fn apply_flip_y(mut blc: ImageBlock) -> Result<ImageBlock>
     let mut fuck_rust : HashMap<Point, u8> = HashMap::new();
     for ((x, y), color) in &blc.block
     {
-        fuck_rust.insert((*x, y_max - y), *color);
+        fuck_rust.insert((*x, y_max - *y), *color);
         fuck_rust.insert((*x, *y), blc.block[&(*x, y_max - *y)]);
     }
 
