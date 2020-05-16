@@ -16,9 +16,10 @@ pub struct ImageBlock {
 }
 
 pub enum Operation {
-    Block(Point, (u64, u64)),  // (x0, y0), (w, h) 
-    Shift(Vector), // vector
-    Rotate(Point, f64), // pivot, radian
+    Block(Point, (u64, u64)),
+    Pivot(Point),
+    Shift(Vector),
+    Rotate(f64),
     ChangeColor(fn (u8) -> u8),
     ChangeColorUnconditionally(u8),
     FilterBy(fn (Point, u8) -> bool),
@@ -27,65 +28,61 @@ pub enum Operation {
     ExtractObjects,
 }
 
-pub fn apply_block(src: ImageBlock, pivot: &Point, w: u64, h: u64) -> Result<ImageBlock>
+pub fn apply_block(mut blc: ImageBlock, pivot: &Point, w: u64, h: u64) -> Result<ImageBlock>
 {
-    let mut blc = ImageBlock {
-        pivot: *pivot,
-        block: HashMap::new()
-    };
-    for x in (blc.pivot.0 as u64)..w
+    assert!(pivot.0 >= 0);
+    assert!(pivot.1 >= 0);
+    let mut new_block : HashMap<Point, u8> = HashMap::new();
+    for ((x, y), color) in &blc.block
     {
-        for y in (blc.pivot.1 as u64)..h
+        //println!("pivot : {}, {}, w: {} h: {}", pivot.0, pivot.1, w, h);
+        //println!("x: {}, y: {}", *x, *y);
+        if *x >= pivot.0 && *x < (pivot.0 + (w as i64)) && *y >= pivot.1 && *y < (pivot.1 + (h as i64))
         {
-            let elem = src.block.get(&(x as i64, y as i64));
-            match elem
-            {
-                Some(&value) => { blc.block.insert((x as i64, y as i64), value); },
-                None => assert!(false, "impossible"),
-            }
+            //println!("inserting: ({}, {}) = {} at original ({}, {})", *x - pivot.0, *y - pivot.1, *color, *x, *y);
+            new_block.insert((*x - pivot.0, *y - pivot.1), *color);
         }
     }
+    blc.block = new_block;
+    blc.pivot = (blc.pivot.0 + pivot.0, blc.pivot.1 + pivot.1);
+    Ok(blc)
+}
+
+pub fn apply_pivot(mut blc: ImageBlock, pivot: &Point) -> Result<ImageBlock>
+{
+    let mut new_block : HashMap<Point, u8> = HashMap::new();
+    for ((x, y), color) in &blc.block
+    {
+        new_block.insert((*x - pivot.0, *y - pivot.1), *color);
+    }
+    blc.block = new_block;
+    blc.pivot = (blc.pivot.0 + pivot.0, blc.pivot.1 + pivot.1);
     Ok(blc)
 }
 
 pub fn apply_shift(mut blc: ImageBlock, v: &Vector) -> Result<ImageBlock>
 {
-    let mut new_block : HashMap<Point, u8> = HashMap::new();
-    for ((x, y), color) in &blc.block
-    {
-        let new_x = *x + v.0;
-        let new_y = *y + v.1;
-        new_block.insert((new_x, new_y), *color);
-    }
-    blc.block = new_block;
-
     blc.pivot.0 += v.0;
     blc.pivot.1 += v.1;
-
     Ok(blc)
 }
 
-pub fn apply_rotate(mut blc: ImageBlock, pivot: &Point, angle: f64) -> Result<ImageBlock>
+pub fn apply_rotate(mut blc: ImageBlock, angle: f64) -> Result<ImageBlock>
 {
     let c = angle.cos();
     let s = angle.sin();
 
-    let vec_x = (pivot.0 - blc.pivot.0) as f64;
-    let vec_y = (pivot.1 - blc.pivot.1) as f64;
-    let vec_x_new = c * vec_x - s * vec_y;
-    let vec_y_new = s * vec_x + c * vec_y;
-
     let mut new_block : HashMap<Point, u8> = HashMap::new();
     for ((x, y), color) in &blc.block
     {
-        let xf = *x as f64;
-        let yf = *y as f64;
-        let new_x = (round::half_up(xf + vec_x_new, 0)) as i64;
-        let new_y = (round::half_up(yf + vec_y_new, 0)) as i64;
+        let x_new = c * (*x as f64) + s * (*y as f64);
+        let y_new = -s * (*x as f64) + c * (*y as f64);
+        println!("x_new: {}, y_new: {}, color: {}", x_new, y_new, *color);
+        let new_x = (round::half_up(x_new, 0)) as i64;
+        let new_y = (round::half_up(y_new, 0)) as i64;
         new_block.insert((new_x, new_y), *color);
     }
     blc.block = new_block;
-    blc.pivot = (round::half_up((pivot.0 as f64) + vec_x_new, 0) as i64, round::half_up((pivot.1 as f64) + vec_y_new, 0) as i64);
     Ok(blc)
 }
 
@@ -190,9 +187,10 @@ pub fn apply_block_operation(blc: ImageBlock, op: &Operation) -> Result<ImageBlo
 {
     match op
     {
-        Operation::Block(p, (w, h)) => apply_block(blc, p, *w, *h), 
+        Operation::Block(p, (w, h)) => apply_block(blc, p, *w, *h),
+        Operation::Pivot(p) => apply_pivot(blc, p),
         Operation::Shift(vec) => apply_shift(blc, vec),
-        Operation::Rotate(p, angle) => apply_rotate(blc, p, *angle),
+        Operation::Rotate(angle) => apply_rotate(blc, *angle),
         Operation::ChangeColor(func) => apply_change_color(blc, *func),
         Operation::ChangeColorUnconditionally(color) => apply_change_color_unconditionally(blc, *color),
         Operation::FilterBy(pred) => apply_filter_by(blc, *pred),
@@ -208,11 +206,11 @@ pub fn extract_block_from_image(src: &Image, pivot: &Point, w: u64, h: u64) -> R
         pivot: *pivot,
         block: HashMap::new(),
     };
-    for x in 0..w
+    for x in pivot.0..(pivot.0 + (w as i64))
     {
-        for y in 0..h
+        for y in pivot.1..(pivot.1 + (h as i64))
         {
-            blc.block.insert((x as i64, y as i64), src[(x as usize, y as usize)]);
+            blc.block.insert((x - pivot.0, y - pivot.1), src[(x as usize, y as usize)]);
         }
     }
     Ok(blc)
