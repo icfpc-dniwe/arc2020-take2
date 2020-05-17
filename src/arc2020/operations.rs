@@ -6,6 +6,7 @@ use std;
 use std::cmp;
 use std::collections::HashMap;
 use std::collections::LinkedList;
+use std::iter::FromIterator;
 
 pub type Point = (i64, i64);
 pub type Vector = (i64, i64);
@@ -25,37 +26,31 @@ pub enum Operation {
     FilterBy(fn (Point, u8) -> bool),
     FlipX,
     FlipY,
-    ExtractObjects,
 }
 
 pub fn apply_block(mut blc: ImageBlock, pivot: &Point, w: u64, h: u64) -> Result<ImageBlock>
 {
-    //assert!(pivot.0 >= 0);
-    //assert!(pivot.1 >= 0);
-    let mut new_block : HashMap<Point, u8> = HashMap::new();
-    for ((x, y), color) in &blc.block
+    // rust is just impossibly stubborn
+    let mut tmp_map : HashMap<Point, u8> = HashMap::from_iter(blc.block.drain());
+    for ((x, y), color) in tmp_map.drain()
     {
-        //println!("pivot : {}, {}, w: {} h: {}", pivot.0, pivot.1, w, h);
-        //println!("x: {}, y: {}", *x, *y);
-        if *x >= pivot.0 && *x < (pivot.0 + (w as i64)) && *y >= pivot.1 && *y < (pivot.1 + (h as i64))
+        if x >= pivot.0 && x < (pivot.0 + (w as i64)) && y >= pivot.1 && y < (pivot.1 + (h as i64))
         {
-            //println!("inserting: ({}, {}) = {} at original ({}, {})", *x - pivot.0, *y - pivot.1, *color, *x, *y);
-            new_block.insert((*x - pivot.0, *y - pivot.1), *color);
+            blc.block.insert((x - pivot.0, y - pivot.1), color);
         }
     }
-    blc.block = new_block;
     blc.pivot = (blc.pivot.0 + pivot.0, blc.pivot.1 + pivot.1);
     Ok(blc)
 }
 
 pub fn apply_pivot(mut blc: ImageBlock, pivot: &Point) -> Result<ImageBlock>
 {
-    let mut new_block : HashMap<Point, u8> = HashMap::new();
-    for ((x, y), color) in &blc.block
+    // rust is just impossibly stubborn
+    let mut tmp_map : HashMap<Point, u8> = HashMap::from_iter(blc.block.drain());
+    for ((x, y), color) in tmp_map.drain()
     {
-        new_block.insert((*x - pivot.0, *y - pivot.1), *color);
+        blc.block.insert((x - pivot.0, y - pivot.1), color);
     }
-    blc.block = new_block;
     blc.pivot = (blc.pivot.0 + pivot.0, blc.pivot.1 + pivot.1);
     Ok(blc)
 }
@@ -72,31 +67,25 @@ pub fn apply_rotate(mut blc: ImageBlock, angle: f64) -> Result<ImageBlock>
     let c = angle.cos();
     let s = angle.sin();
 
-    let mut new_block : HashMap<Point, u8> = HashMap::new();
-    for ((x, y), color) in &blc.block
+    // rust is just impossibly stubborn
+    let mut tmp_map : HashMap<Point, u8> = HashMap::from_iter(blc.block.drain());
+    for ((x, y), color) in tmp_map.drain()
     {
-        let x_new = c * (*x as f64) + s * (*y as f64);
-        let y_new = -s * (*x as f64) + c * (*y as f64);
-        //println!("x_new: {}, y_new: {}, color: {}", x_new, y_new, *color);
+        let x_new = c * (x as f64) + s * (y as f64);
+        let y_new = -s * (x as f64) + c * (y as f64);
         let new_x = (round::half_up(x_new, 0)) as i64;
         let new_y = (round::half_up(y_new, 0)) as i64;
-        new_block.insert((new_x, new_y), *color);
+        blc.block.insert((new_x, new_y), color);
     }
-    blc.block = new_block;
+
     Ok(blc)
 }
 
 pub fn apply_change_color(mut blc: ImageBlock, func: fn (u8) -> u8) -> Result<ImageBlock>
 {
-    let mut fuck_rust : HashMap<Point, u8> = HashMap::new();
-    for ((x, y), color) in &blc.block
+    for (_, color) in blc.block.iter_mut()
     {
-        fuck_rust.insert((*x, *y), func(*color));
-    }
-
-    for (p, c) in fuck_rust
-    {
-        blc.block.insert(p, c);
+        *color = func(*color);
     }
 
     Ok(blc)
@@ -104,15 +93,9 @@ pub fn apply_change_color(mut blc: ImageBlock, func: fn (u8) -> u8) -> Result<Im
 
 pub fn apply_change_color_unconditionally(mut blc: ImageBlock, color: u8) -> Result<ImageBlock>
 {
-    let mut fuck_rust : HashMap<Point, u8> = HashMap::new();
-    for ((x, y), _) in &blc.block
+    for (_, _color) in blc.block.iter_mut()
     {
-        fuck_rust.insert((*x, *y), color);
-    }
-
-    for (p, c) in fuck_rust
-    {
-        blc.block.insert(p, c);
+        *_color = color;
     }
 
     Ok(blc)
@@ -126,16 +109,11 @@ pub fn apply_flip_x(mut blc: ImageBlock) -> Result<ImageBlock>
         x_max = cmp::max(x_max, *x);
     }
 
-    let mut fuck_rust : HashMap<Point, u8> = HashMap::new();
-    for ((x, y), color) in &blc.block
+    // rust is just impossibly stubborn
+    let mut tmp_map : HashMap<Point, u8> = HashMap::from_iter(blc.block.drain());
+    for ((x, y), color) in tmp_map.drain()
     {
-        fuck_rust.insert((x_max - *x, *y), *color);
-        fuck_rust.insert((*x, *y), blc.block[&(x_max - *x, *y)]);
-    }
-
-    for (p, c) in fuck_rust
-    {
-        blc.block.insert(p, c);
+        blc.block.insert((x_max - x, y), color);
     }
 
     Ok(blc)
@@ -149,16 +127,11 @@ pub fn apply_flip_y(mut blc: ImageBlock) -> Result<ImageBlock>
         y_max = cmp::max(y_max, *y);
     }
 
-    let mut fuck_rust : HashMap<Point, u8> = HashMap::new();
-    for ((x, y), color) in &blc.block
+    // rust is just impossibly stubborn
+    let mut tmp_map : HashMap<Point, u8> = HashMap::from_iter(blc.block.drain());
+    for ((x, y), color) in tmp_map.drain()
     {
-        fuck_rust.insert((*x, y_max - *y), *color);
-        fuck_rust.insert((*x, *y), blc.block[&(*x, y_max - *y)]);
-    }
-
-    for (p, c) in fuck_rust
-    {
-        blc.block.insert(p, c);
+        blc.block.insert((x, y_max - y), color);
     }
 
     Ok(blc)
@@ -166,21 +139,21 @@ pub fn apply_flip_y(mut blc: ImageBlock) -> Result<ImageBlock>
 
 pub fn apply_filter_by(mut blc: ImageBlock, pred: fn (Point, u8) -> bool) -> Result<ImageBlock>
 {
-    let mut new_block : HashMap<Point, u8> = HashMap::new();
-    for ((x, y), color) in &blc.block
+    let mut to_remove = LinkedList::new();
+    for ((x, y), color) in blc.block.iter()
     {
-        if pred((*x, *y), *color)
+        if !pred((*x, *y), *color)
         {
-            new_block.insert((*x, *y), *color);
+            to_remove.push_back((*x, *y));
         }
     }
-    blc.block = new_block;
-    Ok(blc)
-}
+    
+    for p in to_remove
+    {
+        blc.block.remove(&p);
+    }
 
-pub fn apply_extract_objects(_blc: ImageBlock) -> Result<ImageBlock>
-{
-    Err(anyhow!("not implemented"))
+    Ok(blc)
 }
 
 pub fn apply_block_operation(blc: ImageBlock, op: &Operation) -> Result<ImageBlock>
@@ -196,7 +169,6 @@ pub fn apply_block_operation(blc: ImageBlock, op: &Operation) -> Result<ImageBlo
         Operation::FilterBy(pred) => apply_filter_by(blc, *pred),
         Operation::FlipX => apply_flip_x(blc),
         Operation::FlipY => apply_flip_y(blc),
-        Operation::ExtractObjects => apply_extract_objects(blc),
     }
 }
 
