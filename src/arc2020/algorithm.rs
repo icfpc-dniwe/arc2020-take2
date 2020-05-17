@@ -15,6 +15,7 @@ pub fn extract_objects(img: &Image, bg_color: u8, pred_neigh: fn (&(usize, usize
     // for each color extract one or more sets of neighbours
     // after this pass we can still have 2 separate sets of neighbours for object parts
     // these will be merged later on second pass
+    println!("first pass:");
     for (p, c) in img.indexed_iter()
     {
         if *c == bg_color
@@ -28,17 +29,16 @@ pub fn extract_objects(img: &Image, bg_color: u8, pred_neigh: fn (&(usize, usize
         }
 
         let cur_list = blocks.get_mut(c).unwrap();
-
-        if cur_list.len() == 0
-        {
-            cur_list.push_back(HashSet::new());
-        }
+        //println!("  current point: {:?}, color: {}", p, c);
+        //println!("  current list: {:?}", cur_list);
 
         let mut found = false;
         for set in cur_list.iter_mut()
         {
+            //println!("    set: {:?}", set);
             for pt in set.iter()
             {
+                //println!("      pred neigh: {:?}, {:?} -> {}", &p, pt, pred_neigh(&p, pt));
                 if pred_neigh(&p, pt)
                 {
                     found = true;
@@ -49,6 +49,7 @@ pub fn extract_objects(img: &Image, bg_color: u8, pred_neigh: fn (&(usize, usize
             if found
             {
                 set.insert(p);
+                break;
             }
         }
 
@@ -59,29 +60,48 @@ pub fn extract_objects(img: &Image, bg_color: u8, pred_neigh: fn (&(usize, usize
             cur_list.push_back(new_set);
         }
     }
+    //println!("{:?}", blocks);
 
     // merge sets, that relate to the same object and obtain only sets corresponding to separate objects of different color
+    //println!("second pass:");
     let mut objs = LinkedList::new();
     for (_, obj_set_list) in blocks.iter_mut()
     {
+        //println!("  current color: {}", c);
+        //println!("  current list:");
+        //println!("  {:?}", obj_set_list);
+        let mut prev_object_len = 0;
+        let mut cur_obj = HashSet::new();
         loop
         {
-            let mut cur_obj = HashSet::new();
+            //println!("    current object:");
+            //println!("    {:?}", &cur_obj);
             for set in obj_set_list.iter_mut()
             {
+                //println!("      current set:");
+                //println!("      {:?}", *set);
                 let mut merge = false;
-                for pt0 in set.iter()
+                if cur_obj.len() > 0
                 {
-                    for pt1 in cur_obj.iter()
+                    for pt0 in set.iter()
                     {
-                        if pred_neigh(pt0, pt1)
+                        for pt1 in cur_obj.iter()
                         {
-                            merge = true;
-                            break;
-                        }
-                    } 
+                            //println!("      pred neigh: {:?}, {:?} -> {}", pt0, pt1, pred_neigh(pt0, pt1));
+                            if pred_neigh(pt0, pt1)
+                            {
+                                merge = true;
+                                break;
+                            }
+                        } 
+                    }
+                }
+                else
+                {
+                    merge = true;    
                 }
 
+                //println!("      merge: {}", merge);
                 if merge
                 {
                     for elem in set.drain()
@@ -91,9 +111,17 @@ pub fn extract_objects(img: &Image, bg_color: u8, pred_neigh: fn (&(usize, usize
                 }
             }
 
+            //println!("      prev object len {}", prev_object_len);
+            //println!("      cur object len {}", cur_obj.len());
             if cur_obj.len() != 0
             {
-                objs.push_back(Vec::from_iter(cur_obj.into_iter()));
+                if cur_obj.len() == prev_object_len
+                {
+                    //println!("      add object to output: {:?}", cur_obj);
+                    objs.push_back(Vec::from_iter(cur_obj.into_iter()));
+                    cur_obj = HashSet::new()
+                }
+                prev_object_len = cur_obj.len();
             }
             else
             {
