@@ -3,6 +3,7 @@ use ndarray::{CowArray, Array2, Ix2, ArrayView2};
 pub type Image = Array2<u8>;
 pub type CowImage<'a> = CowArray<'a, u8, Ix2>;
 pub type ImageView<'a> = ArrayView2<'a, u8>;
+pub type BoundingBox = ((usize, usize), (usize, usize));
 
 #[derive(Debug)]
 pub struct TaskTrain {
